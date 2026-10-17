@@ -182,4 +182,17 @@ package Boxflex.Flex with SPARK_Mode is
    --  line always takes at least one item, so an item wider than the
    --  container overflows its own line instead of opening an empty one.
 
+   procedure Distribute_Grow (C : Container; Items : in out Item_Array)
+     with
+       Pre  => Items'Length <= Max_Nodes,
+       Post => (for all K in Items'Range =>
+                  Inputs_Unchanged (Items'Old (K), Items (K))
+                  and then Items (K).Main >= Items'Old (K).Main);
+   --  Step 3, positive free space only, for a single line. Expects each
+   --  item's Main to already hold its hypothetical main size. Shares the
+   --  space left on the line among the items in proportion to Grow, and
+   --  hands out the leftover 1/256 px units one at a time, first item
+   --  first, so the line is filled exactly. Does nothing when there is no
+   --  free space or no item has Grow > 0. Max_Main is not applied yet.
+
 end Boxflex.Flex;
