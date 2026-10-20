@@ -4,15 +4,20 @@ package body Boxflex.Flex with SPARK_Mode is
    --  Coord'Small in a wide integer instead.
    type Units is range -2 ** 62 .. 2 ** 62 - 1;
 
+   Length_Unit : constant Length := Length'Small;
+   Coord_Unit : constant Coord := Coord'Small;
+   Ratio_Unit : constant Ratio := Ratio'Small;
+   --  One step of each fixed-point type, used to convert to and from Units.
+
    function To_Units (L : Length) return Units is
-     (Units (Long_Long_Integer'Integer_Value (L)));
+     (Units (L / Length_Unit));
 
    function Grow_Units (R : Ratio) return Units is
-      (Units (Long_Long_Integer'Integer_Value (R)));
+      (Units (R / Ratio_Unit));
    --  A Ratio as a whole number of its 1/1024 steps (1.0 is 1024).
 
    function To_Length (U : Units) return Length is
-     (Length'Fixed_Value (Long_Long_Integer (U)))
+     (Length_Unit * Integer (U))
        with Pre => U >= 0 and then U <= To_Units (Length'Last);
    --  Units back to a Length. The caller guarantees it fits.
 
@@ -127,7 +132,7 @@ package body Boxflex.Flex with SPARK_Mode is
       --   so a position of at most Length'Last (as a Coord) is safe
 
       function Pos (U : Units) return Coord is
-         (if U > Max_U then Max_Pos else Coord'Fixed_Value (Long_Long_Integer (U)))
+         (if U > Max_U then Max_Pos else Coord_Unit * Integer (U))
          with Pre => U >= 0;
       --   Units to Coord, saturating at Max_Pos.
 
