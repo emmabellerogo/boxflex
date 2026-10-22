@@ -99,6 +99,20 @@ procedure Tests is
       Check ("hypothetical: basis",  Hypothetical_Main (It (1)) = 50.0);
       Check ("hypothetical: clamped", Hypothetical_Main (It (2)) = 80.0);
 
+      -- Hypothetical_Main edge cases
+      declare
+         H: constant Item_Array (1 .. 3) :=
+            [1 => (Content_Main => 40.0, others => <>),
+            2 => (Basis => 10.0, Basis_Definite => True, Min_Main => 30.0, others => <>),
+            3 => (Basis => 70.0, Basis_Definite => True, Min_Main => 100.0,
+                  Max_Main => 50.0, others => <>)];
+
+      begin
+         Check ("hypothetical: content when basis not defined",
+               Hypothetical_Main (H (1)) = 40.0);
+         Check ("hypothetical: raised to min", Hypothetical_Main (H (2)) = 30.0);
+         Check ("hypothetical: min wins over max", Hypothetical_Main (H (3)) = 100.0);
+      end;
       Form_Lines (C, It, L, N);
       Check ("no wrap: one line", N = 1 and then L (1) = (First => 1, Last => 2));
 
