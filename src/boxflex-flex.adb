@@ -117,12 +117,32 @@ package body Boxflex.Flex with SPARK_Mode is
       end loop;
    end Distribute_Grow;
 
+   -------------------
+   -- Cross helpers --
+   -------------------
+
+   function Effective_Align (C : Container; I : Item) return Align_Self is
+      (if I.Self /= Auto then I.Self
+       else (case C.Align is
+               when Stretch => Stretch,
+               when Flex_Start   => Flex_Start,
+               when Flex_End     => Flex_End,
+               when Center  => Center,
+               when Baseline => Baseline));
+   --  The item's own Self wins over the container's Align, except that Auto is ignored.
+
+   function Room (C : Container; I : Item) return Units is
+      (To_Units (C.Cross) - To_Units (I.Margin_Cross_Start)
+                          - To_Units (I.Margin_Cross_End));
+   --  Cross space left for the item once its cross margins are taken
+   --  Can be negative if the margins are bigger than the container.
+
    -------------
    -- Resolve --
    -------------
 
    --  Steps 1, 3 (grow only) and 7. Still missing: shrink, wrap,
-   --  strech, justify, align, reversed directions.
+   --  justify, align, reversed directions.
 
    procedure Resolve (C : Container; Items : in out Item_Array) is
       Cursor : Units := 0;
@@ -148,6 +168,21 @@ package body Boxflex.Flex with SPARK_Mode is
       if C.Wrap = No_Wrap then
          Distribute_Grow (C, Items);
       end if;
+
+      --  Step 4: Stretch. No declared cross size + Stretch = fill the line.
+      for K in Items'Range loop
+         if Effective_Align (C, Items (K)) = Stretch
+         and then not Items (K).Cross_Definite
+         then
+            declare
+               R : constant Units := Room (C, Items (K));
+            begin
+               Items (K).Cross :=
+                  Clamp ((if R <= 0 then 0.0 else To_Length (R)),
+                         Items (K).Min_Cross, Items (K).Max_Cross);
+            end;
+         end if;
+      end loop;
 
       --  Step 7: place items one after the other along the main axis.
       for K in Items'Range loop
