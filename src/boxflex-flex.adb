@@ -121,6 +121,7 @@ package body Boxflex.Flex with SPARK_Mode is
    -- Cross helpers --
    -------------------
 
+   --  The item's own Self winsl Auto means "use the container's Align"
    function Effective_Align (C : Container; I : Item) return Align_Self is
       (if I.Self /= Auto then I.Self
        else (case C.Align is
@@ -137,12 +138,26 @@ package body Boxflex.Flex with SPARK_Mode is
    --  Cross space left for the item once its cross margins are taken
    --  Can be negative if the margins are bigger than the container.
 
+   function Free_Cross (C : Container; I : Item) return Units is
+      (Room (C, I) - To_Units (I.Cross));
+   --  Room the item does not use. Negative if the item is too big.
+
+   function Cross_Offset (C : Container; I : Item) return Units is
+      (if Free_Cross (C, I) <= 0 then 0 --  too big: pin to the start for now
+       else (case Effective_Align (C, I) is
+               when Center     => Free_Cross (C, I) / 2,
+               when Flex_End   => Free_Cross (C, I),
+               when Auto | Stretch | Flex_Start | Baseline   => 0)); --  TODO: baseline alignment
+   --  How far past the Margin_Cross_Start the item sits on the cross axis.
+   --  Baseline is out of scope for v1 (ARCHITECTURE.md), so it acts
+   --  like Flex_Start for now.
+
    -------------
    -- Resolve --
    -------------
 
-   --  Steps 1, 3 (grow only) and 7. Still missing: shrink, wrap,
-   --  justify, align, reversed directions.
+   --  Steps 1, 3 (grow only), 4 (stretch), 6 (align, single line) and 7.
+   --  Still missing: shrink, wrap, justify, reversed directions.
 
    procedure Resolve (C : Container; Items : in out Item_Array) is
       Cursor : Units := 0;
@@ -192,7 +207,8 @@ package body Boxflex.Flex with SPARK_Mode is
 
          Cursor := Cursor + To_Units (Items (K).Margin_Main_Start);
          Items (K).Pos_Main := Pos (Cursor);
-         Items (K).Pos_Cross := Pos (To_Units (Items (K).Margin_Cross_Start));
+         Items (K).Pos_Cross :=
+            Pos (To_Units (Items (K).Margin_Cross_Start) + Cross_Offset (C, Items (K)));
 
          Cursor := Cursor + To_Units (Items (K).Main)
                            + To_Units (Items (K).Margin_Main_End) + Gap;
