@@ -172,6 +172,22 @@ procedure Tests is
          Check ("grow: zero grow leaves the size alone", G (1).Main = 50.0);
       end;
 
+      -- stretch: container 300 x 100, default Align is Stretch declase
+      declare
+         SC : constant Container := (Main => 300.0, Cross => 100.0, others => <>);
+         S  : Item_Array (1 .. 4) :=
+               [1 => (others => <>),
+                2 => (Margin_Cross_Start => 5.0, Margin_Cross_End => 5.0, others => <>),
+                3 => (Content_Cross => 20.0, Cross_Definite => True, others => <>),
+                4 => (Max_Cross => 60.0, others => <>)];
+      begin
+         Resolve (SC, S);
+         Check ("stretch: fills the cross axis", S (1).Cross = 100.0 and then S (1).Pos_Cross = 0.0);
+         Check ("stretch: minus cross margins", S (2).Cross = 90.0 and then S (2).Pos_Cross = 5.0);
+         Check ("stretch: declared size is kept", S (3).Cross = 20.0);
+         Check ("stretch: max wins", S (4).Cross = 60.0);
+      end;
+
       --  pending, once grow is implemented:
       --  It (1).Grow := 1.0; It (2).Grow := 1.0; It (2).Max_Main := Length'Last;
       --  Resolve (C, It);
