@@ -214,6 +214,71 @@ procedure Tests is
    end Test_Flex;
 
    ---------------------------------------------------------------------
+   --  Exactness: each expected value is computed from the engine's
+   --  rules in whole 1/256 px steps, never copied from a browser.
+   ---------------------------------------------------------------------
+
+   procedure Test_Exactness is
+      use Boxflex.Flex;
+
+      type Steps is range -2 ** 62 .. 2 ** 62 - 1;
+      Step : constant Coord := Coord'Small;  --  one step = 1/256 px
+
+      function To_Steps (X : Coord) return Steps is (Steps (X / Step));
+   begin
+      --  The showcase content row: sidebar 200 px, main grow 2,
+      --  panel grow 1, gaps of 8 px, in a 784 px line.
+      declare
+         C : constant Container :=
+           (Main => 784.0, Cross => 536.0, Main_Gap => 8.0, others => <>);
+         R : Item_Array (1 .. 3) :=
+           [1 => (Basis => 200.0, Basis_Definite => True, others => <>),
+            2 => (Grow => 2.0, others => <>),
+            3 => (Grow => 1.0, others => <>)];
+
+         --  Rule 1: free space = line - fixed sizes - gaps.
+         Free : constant Steps :=
+           To_Steps (784.0) - To_Steps (200.0) - 2 * To_Steps (8.0);
+         --  Rule 2: each grower gets Free * Grow / Total_Grow, rounded down.
+         Main_Share  : constant Steps := Free * 2 / 3;
+         Panel_Share : constant Steps := Free * 1 / 3;
+         --  Rule 3: leftover steps go to growers in order, one each.
+         --  Two round-downs lose less than 2 steps, so main gets them all.
+         Leftover : constant Steps := Free - Main_Share - Panel_Share;
+         Main_E   : constant Steps := Main_Share + Leftover;
+         Panel_E  : constant Steps := Panel_Share;
+      begin
+         Resolve (C, R);
+         Check ("exact: main follows the grow rule", To_Steps (R (2).Main) = Main_E);
+         Check ("exact: panel follows the grow rule", To_Steps (R (3).Main) = Panel_E);
+         Check ("exact: remainder conserved",
+                To_Steps (R (2).Main) + To_Steps (R (3).Main) = Free);
+         --  |main - 2/3 * Free| < 1 step, written without fractions.
+         Check ("exact: main within one step of 2/3",
+                abs (3 * To_Steps (R (2).Main) - 2 * Free) < 3);
+         Check ("exact: panel starts after sidebar, main and two gaps",
+                To_Steps (R (3).Pos_Main)
+                  = To_Steps (200.0) + 2 * To_Steps (8.0) + Main_E);
+      end;
+
+      --  Center with an odd number of free steps: 100 px line,
+      --  item 33 px plus one step, so (Room - Cross) / 2 must round.
+      declare
+         C : constant Container := (Main => 100.0, Cross => 100.0, others => <>);
+         A : Item_Array (1 .. 1) :=
+           [1 => (Content_Cross => 33.0 + Step, Cross_Definite => True,
+                  Self => Center, others => <>)];
+         Free : constant Steps := To_Steps (100.0) - To_Steps (33.0 + Step);
+      begin
+         Resolve (C, A);
+         Check ("exact: center is free / 2 rounded down",
+                To_Steps (A (1).Pos_Cross) = Free / 2);
+         Check ("exact: center within one step of the middle",
+                abs (2 * To_Steps (A (1).Pos_Cross) - Free) < 2);
+      end;
+   end Test_Exactness;
+
+   ---------------------------------------------------------------------
    --  Layout (the tree walk)
    ---------------------------------------------------------------------
 
@@ -257,6 +322,7 @@ begin
    Test_Geometry;
    Test_Tree;
    Test_Flex;
+   Test_Exactness;
    Test_Layout;
 
    New_Line;
