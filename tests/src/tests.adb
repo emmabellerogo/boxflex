@@ -99,6 +99,20 @@ procedure Tests is
       Check ("hypothetical: basis",  Hypothetical_Main (It (1)) = 50.0);
       Check ("hypothetical: clamped", Hypothetical_Main (It (2)) = 80.0);
 
+      -- Hypothetical_Main edge cases
+      declare
+         H: constant Item_Array (1 .. 3) :=
+            [1 => (Content_Main => 40.0, others => <>),
+            2 => (Basis => 10.0, Basis_Definite => True, Min_Main => 30.0, others => <>),
+            3 => (Basis => 70.0, Basis_Definite => True, Min_Main => 100.0,
+                  Max_Main => 50.0, others => <>)];
+
+      begin
+         Check ("hypothetical: content when basis not defined",
+               Hypothetical_Main (H (1)) = 40.0);
+         Check ("hypothetical: raised to min", Hypothetical_Main (H (2)) = 30.0);
+         Check ("hypothetical: min wins over max", Hypothetical_Main (H (3)) = 100.0);
+      end;
       Form_Lines (C, It, L, N);
       Check ("no wrap: one line", N = 1 and then L (1) = (First => 1, Last => 2));
 
@@ -114,6 +128,49 @@ procedure Tests is
       Check ("resolve: margin",     It (1).Pos_Main = 5.0);
       Check ("resolve: packed",     It (2).Pos_Main = 55.0);
       Check ("resolve: in range",   Placed_In_Range (It (1)) and Placed_In_Range (It (2)));
+
+      --  grow: 200 - (5 + 50 + 80) = 65 xp free, split evenly (32.5 each)
+      declare
+         G : Item_Array (1 .. 2) :=
+             [1 => (Basis => 50.0, Basis_Definite => True, Grow => 1.0,
+                     Margin_Main_Start => 5.0, others => <>),
+              2 => (Basis => 80.0, Basis_Definite => True, Grow => 1.0,
+                     others => <>)];
+      begin
+         Resolve (C, G);
+         Check ("grow: sizes", G (1).Main = 82.5 and then G (2).Main = 112.5);
+         Check ("grow: positions", G (1).Pos_Main = 5.0 and then G (2).Pos_Main = 87.5);
+         Check ("grow: fills the line", G (2).Pos_Main + G (2).Main = 200.0);
+      end;
+
+      -- grow 2:1 90 px free, so 60 and 30
+      declare
+         G : Item_Array (1 .. 2) :=
+             [1 => (Grow => 2.0, others => <>),
+              2 => (Grow => 1.0, others => <>)];
+      begin
+         Resolve ((Main => 90.0, Cross => 10.0, others => <>), G);
+         Check ("grow 2:1: sizes", G (1).Main = 60.0 and then G (2).Main = 30.0);
+      end;
+
+      -- grow with an uneven split: 100 px / 3 leaves one 1/256 px unit over
+      declare
+         G : Item_Array (1 .. 3) := [others => (Grow => 1.0, others => <>)];
+      begin
+         Resolve ((Main => 100.0, Cross => 10.0, others => <>), G);
+         Check ("grow: remainder keeps the line exact",
+                  G (1).Main + G (2).Main + G (3).Main = 100.0);
+         Check ("grow: leftover goes to the first item", G (1).Main > G (2).Main and then G (2).Main = G (3).Main);
+      end;
+
+      --  no grow: free space stays unused
+      declare
+         G : Item_Array (1 .. 1) :=
+             [1 => (Basis => 50.0, Basis_Definite => True,  others => <>)];
+      begin
+         Resolve (C, G);
+         Check ("grow: zero grow leaves the size alone", G (1).Main = 50.0);
+      end;
 
       --  pending, once grow is implemented:
       --  It (1).Grow := 1.0; It (2).Grow := 1.0; It (2).Max_Main := Length'Last;
@@ -145,6 +202,11 @@ procedure Tests is
              Layout_Of (T, R) = Make (0.0, 0.0, 200.0, 100.0));
       Check ("structure untouched", Child_Count (T, R) = 2);
       Check ("children placed", Placed (Layout_Of (T, A)) and Placed (Layout_Of (T, B)));
+
+      Check ("growers split the width",
+             Layout_Of (T, A). Extent.Width = 100.0
+             and Layout_Of (T, B). Extent.Width = 100.0
+             and Layout_Of (T, B).Origin.X = 100.0);
 
       --  pending: two equal growers split the main axis
       --  Check ("A is left half",  Layout_Of (T, A) = Make (0.0,   0.0, 100.0, 100.0));
