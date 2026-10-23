@@ -188,6 +188,25 @@ procedure Tests is
          Check ("stretch: max wins", S (4).Cross = 60.0);
       end;
 
+      --  cross-axis alignment: 32 px item in a 100 px line
+      declare
+         AC : Container := (Main => 300.0, Cross => 100.0, others => <>);
+         A  : Item_Array (1 .. 1) :=
+            [1 => (Content_Cross => 32.0, Cross_Definite => True, Self => Center, others => <>)];
+      begin
+         Resolve (AC, A);
+         Check ("align: self center", A (1).Pos_Cross = 34.0);
+
+         AC.Align := Flex_End;
+         A (1).Self := Auto;
+         Resolve (AC, A);
+         Check ("align: container flex-end", A (1).Pos_Cross = 68.0);
+
+         A (1).Self := Flex_Start;
+         Resolve (AC, A);
+         Check ("align: self overrides container", A (1).Pos_Cross = 0.0);
+      end;
+
       --  pending, once grow is implemented:
       --  It (1).Grow := 1.0; It (2).Grow := 1.0; It (2).Max_Main := Length'Last;
       --  Resolve (C, It);
