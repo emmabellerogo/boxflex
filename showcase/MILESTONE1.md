@@ -41,7 +41,15 @@ panel x = 602.6666870117188, panel w = 189.3333282470703.
 
 ## Rounding
 
-The browser rounds layout to 1/64 px; the engine uses 1/256 px steps. With
-stretch and grow in place the engine gives main w = 378.668 and panel
-x = 602.668, w = 189.332. Whether that counts as a match (for example,
-equal when rounded to whole pixels) is a question for Olivier.
+The engine works in whole 1/256 px steps. With stretch and grow in place it
+gives main w = 378.668 and panel x = 602.668, w = 189.332 (printed to three
+decimals; exactly 96939/256, 154283/256 and 48469/256). The exact value,
+2/3 of 568 px, is not a whole number of steps, so it cannot be matched exactly.
+
+Per Olivier, "correct" is defined by the engine's rules, not by the browser:
+free space is shared as Free * Grow / Total_Grow rounded down, leftover steps
+go to growers in order, nothing is lost, and each size is within one step of
+the exact fraction. `Test_Showcase` in `tests/src/tests.adb` computes every
+rect from those rules and requires an exact match. The browser numbers above
+are a secondary check only: each engine value must be within one step
+(1/256 px) of them.

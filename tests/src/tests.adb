@@ -253,11 +253,185 @@ procedure Tests is
       --         and Contains (Layout_Of (T, R), Layout_Of (T, B)));
    end Test_Layout;
 
+   ---------------------------------------------------------------------
+   --  Rules: expected values are worked out from the engine's rules in
+   --  whole 1/256 px steps, never copied from a browser. The browser
+   --  numbers in showcase/MILESTONE1.md are only a secondary check.
+   ---------------------------------------------------------------------
+
+   type Steps is range -2 ** 62 .. 2 ** 62 - 1;
+   Step : constant Coord := Coord'Small;  --  one step = 1/256 px
+
+   function To_Steps (X : Coord) return Steps is (Steps (X / Step));
+   function From_Steps (S : Steps) return Coord is (Step * Integer (S));
+
+   --  The browser reports 32-bit floats. Below 1024 px every such value
+   --  is an exact multiple of 2**(-16) px, so this type holds them with
+   --  no rounding (and no floating point).
+   type Browser_Px is delta 2.0 ** (-16) range 0.0 .. 1024.0
+     with Small => 2.0 ** (-16);
+
+   function Near (Engine : Coord; Browser : Browser_Px) return Boolean is
+     (abs (Browser_Px (Engine) - Browser) <= Browser_Px (Step));
+   --  Secondary check: within one engine step of the browser.
+
+   procedure Test_Showcase is
+      T : Layout_Tree;
+      S : Flex_Style;
+      Root, Toolbar, Content, Sidebar, Main, Panel : Node_Id;
+      Buttons : array (1 .. 3) of Node_Id;
+   begin
+      --  The same tree as showcase/src/showcase.adb.
+      S := Default_Style;
+      S.Direction := Column;
+      S.Padding := Uniform (8.0);
+      S.Gap := 8.0;
+      Insert (T, No_Node, S, Root);
+
+      S := Default_Style;
+      S.Direction := Row;
+      S.Height := Px (40.0);
+      S.Gap := 4.0;
+      S.Align := Center;
+      Insert (T, Root, S, Toolbar);
+
+      for K in Buttons'Range loop
+         S := Default_Style;
+         S.Width := Px (80.0);
+         S.Height := Px (32.0);
+         Insert (T, Toolbar, S, Buttons (K));
+      end loop;
+
+      S := Default_Style;
+      S.Direction := Row;
+      S.Grow := 1.0;
+      S.Gap := 8.0;
+      Insert (T, Root, S, Content);
+
+      S := Default_Style;
+      S.Width := Px (200.0);
+      Insert (T, Content, S, Sidebar);
+
+      S := Default_Style;
+      S.Grow := 2.0;
+      Insert (T, Content, S, Main);
+
+      S := Default_Style;
+      S.Grow := 1.0;
+      Insert (T, Content, S, Panel);
+
+      Boxflex.Layout_Plain.Compute (T, (Width => 800.0, Height => 600.0));
+
+      declare
+         Pad : constant Length := 8.0;               --  root padding
+         Gap : constant Length := 8.0;               --  root and content gap
+         W   : constant Length := 800.0 - 2 * Pad;   --  root inner width
+         H   : constant Length := 600.0 - 2 * Pad;   --  root inner height
+
+         --  Root column: the toolbar is fixed, content is the only grower,
+         --  so it takes all the free height.
+         Content_Y : constant Coord  := Pad + 40.0 + Gap;
+         Content_H : constant Length := H - 40.0 - Gap;
+
+         --  Toolbar row, align center: offset = free cross / 2, rounded down.
+         Button_Y : constant Coord :=
+           Pad + From_Steps ((To_Steps (40.0) - To_Steps (32.0)) / 2);
+
+         --  Content row: free = line - sidebar - two gaps.
+         Free : constant Steps :=
+           To_Steps (W) - To_Steps (200.0) - 2 * To_Steps (Gap);
+         --  Each grower gets Free * Grow / Total_Grow, rounded down.
+         Main_Share  : constant Steps := Free * 2 / 3;
+         Panel_Share : constant Steps := Free * 1 / 3;
+         --  Leftover steps go to growers in order, one each. Two
+         --  round-downs lose less than 2 steps, so main (first) gets it.
+         Leftover : constant Steps := Free - Main_Share - Panel_Share;
+         Main_W   : constant Length := From_Steps (Main_Share + Leftover);
+         Panel_W  : constant Length := From_Steps (Panel_Share);
+         Main_X   : constant Coord  := Pad + 200.0 + Gap;
+         Panel_X  : constant Coord  := Main_X + Main_W + Gap;
+      begin
+         --  Primary: exact equality with the rule-computed rects.
+         Check ("showcase: root", Layout_Of (T, Root) = Make (0.0, 0.0, 800.0, 600.0));
+         Check ("showcase: toolbar stretched",
+                Layout_Of (T, Toolbar) = Make (Pad, Pad, W, 40.0));
+         for K in Buttons'Range loop
+            Check ("showcase: button" & K'Image & " centered",
+                   Layout_Of (T, Buttons (K))
+                     = Make (Pad + (K - 1) * (80.0 + 4.0), Button_Y, 80.0, 32.0));
+         end loop;
+         Check ("showcase: content grows",
+                Layout_Of (T, Content) = Make (Pad, Content_Y, W, Content_H));
+         Check ("showcase: sidebar stretched",
+                Layout_Of (T, Sidebar) = Make (Pad, Content_Y, 200.0, Content_H));
+         Check ("showcase: main follows the grow rule",
+                Layout_Of (T, Main) = Make (Main_X, Content_Y, Main_W, Content_H));
+         Check ("showcase: panel follows the grow rule",
+                Layout_Of (T, Panel) = Make (Panel_X, Content_Y, Panel_W, Content_H));
+
+         --  The rounding stays honest: nothing lost, nothing invented,
+         --  and main is within one step of the exact 2/3 of Free
+         --  (|3 * main - 2 * Free| < 3, written without fractions).
+         Check ("showcase: remainder conserved",
+                To_Steps (Main_W) + To_Steps (Panel_W) = Free);
+         Check ("showcase: main within one step of 2/3",
+                abs (3 * To_Steps (Main_W) - 2 * Free) < 3);
+      end;
+
+      --  Secondary: Chrome's getBoundingClientRect values, copied from
+      --  showcase/MILESTONE1.md (nodes 8 and 9 written out in full).
+      declare
+         type Box is record
+            X, Y, W, H : Browser_Px;
+         end record;
+         Browser : constant array (Node_Id range 1 .. 9) of Box :=
+           [(0.0, 0.0, 800.0, 600.0),
+            (8.0, 8.0, 784.0, 40.0),
+            (8.0, 12.0, 80.0, 32.0),
+            (92.0, 12.0, 80.0, 32.0),
+            (176.0, 12.0, 80.0, 32.0),
+            (8.0, 56.0, 784.0, 536.0),
+            (8.0, 56.0, 200.0, 536.0),
+            (216.0, 56.0, 378.66668701171875, 536.0),
+            (602.66668701171875, 56.0, 189.3333282470703125, 536.0)];
+      begin
+         for N in Browser'Range loop
+            declare
+               R : constant Rect := Layout_Of (T, N);
+               B : constant Box := Browser (N);
+            begin
+               Check ("browser: node" & N'Image & " within one step",
+                      Near (R.Origin.X, B.X) and then Near (R.Origin.Y, B.Y)
+                      and then Near (R.Extent.Width, B.W)
+                      and then Near (R.Extent.Height, B.H));
+            end;
+         end loop;
+      end;
+   end Test_Showcase;
+
+   --  Center with an odd number of free steps: the half step must round
+   --  down, and still land within one step of the true middle.
+   procedure Test_Center_Rounding is
+      use Boxflex.Flex;
+      C : constant Container := (Main => 100.0, Cross => 100.0, others => <>);
+      A : Item_Array (1 .. 1) :=
+        [1 => (Content_Cross => 33.0 + Step, Cross_Definite => True,
+               Self => Center, others => <>)];
+      Free : constant Steps := To_Steps (100.0) - To_Steps (33.0 + Step);
+   begin
+      Resolve (C, A);
+      Check ("center: free / 2 rounded down", To_Steps (A (1).Pos_Cross) = Free / 2);
+      Check ("center: within one step of the middle",
+             abs (2 * To_Steps (A (1).Pos_Cross) - Free) < 2);
+   end Test_Center_Rounding;
+
 begin
    Test_Geometry;
    Test_Tree;
    Test_Flex;
    Test_Layout;
+   Test_Showcase;
+   Test_Center_Rounding;
 
    New_Line;
    if Failures = 0 then
