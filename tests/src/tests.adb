@@ -425,6 +425,23 @@ procedure Tests is
              abs (2 * To_Steps (A (1).Pos_Cross) - Free) < 2);
    end Test_Center_Rounding;
 
+   procedure Test_Justify_Rounding is
+      use Boxflex.Flex;
+      --  space-evenly with 2 items: 100 px free over 3 spaces is 33.33 px,
+      --  which is not a whole number of steps. Each space rounds down.
+      J    : Item_Array (1 .. 2) :=
+        [others => (Basis => 50.0, Basis_Definite => True, others => <>)];
+      Free : constant Steps := To_Steps (100.0);
+      Space : constant Steps := Free / 3;
+   begin
+      Resolve ((Main => 200.0, Cross => 10.0, Justify => Space_Evenly,
+                others => <>), J);
+      Check ("justify: evenly, first space rounds down",
+             To_Steps (J (1).Pos_Main) = Space);
+      Check ("justify: evenly, second item after one more space",
+             To_Steps (J (2).Pos_Main) = 2 * Space + To_Steps (50.0));
+   end Test_Justify_Rounding;
+
 begin
    Test_Geometry;
    Test_Tree;
@@ -432,6 +449,7 @@ begin
    Test_Layout;
    Test_Showcase;
    Test_Center_Rounding;
+   Test_Justify_Rounding;
 
    New_Line;
    if Failures = 0 then

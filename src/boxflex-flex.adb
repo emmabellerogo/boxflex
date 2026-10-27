@@ -172,14 +172,40 @@ package body Boxflex.Flex with SPARK_Mode is
    --  like Flex_Start for now.
 
    -------------
+   -- Justify --
+   -------------
+
+   function Main_Free (C : Container; Items : Item_Array) return Units
+     with Pre => Items'Length <= Max_Nodes;
+   --  Main-axis space the line does not use, after grow. Negative when
+   --  the items overflow the container.
+
+   function Main_Free (C : Container; Items : Item_Array) return Units is
+      Used : Units := 0;
+   begin
+      for K in Items'Range loop
+         pragma Loop_Invariant (Used in 0 .. Units (K - Items'First) * 4 * 2 ** 30);
+         Used := Used + To_Units (Items (K).Margin_Main_Start)
+                      + To_Units (Items (K).Main)
+                      + To_Units (Items (K).Margin_Main_End);
+         if K > Items'First then
+            Used := Used + To_Units (C.Main_Gap);
+         end if;
+      end loop;
+      return To_Units (C.Main) - Used;
+   end Main_Free;
+
+   -------------
    -- Resolve --
    -------------
 
-   --  Steps 1, 3 (grow only), 4 (stretch), 6 (align, single line) and 7.
-   --  Still missing: shrink, wrap, justify, reversed directions.
+   --  Steps 1, 3 (grow only), 4 (stretch), 5 (justify, single line),
+   --  6 (align, single line) and 7.
+   --  Still missing: shrink, wrap, reversed directions.
 
    procedure Resolve (C : Container; Items : in out Item_Array) is
       Cursor : Units := 0;
+      Between : Units := 0;
       Gap    : constant Units := To_Units (C.Main_Gap);
       Max_U : constant Units := To_Units (Length'Last);
       --   Max_Pos = Coord'Last - Length'Last, and Length'Last = 2**22
@@ -218,6 +244,32 @@ package body Boxflex.Flex with SPARK_Mode is
          end if;
       end loop;
 
+      --  Step 5: Justify. Lead = space before the first item, Between =
+      --  extra space added after each gap. Single line only for now.
+      declare
+         Free : constant Units :=
+           (if C.Wrap = No_Wrap then Main_Free (C, Items) else 0);
+         N    : constant Units := Units (Items'Length);
+      begin
+         if Free > 0 and then N > 0 then
+            case C.Justify is
+               when Flex_Start => null;
+               when Flex_End => Cursor := Free;
+               when Center => Cursor := Free / 2;
+               when Space_Between =>
+                  if N > 1 then
+                     Between := Free / (N - 1);
+                  end if;
+               when Space_Around =>
+                  Between := Free / N;
+                  Cursor := Between / 2;
+               when Space_Evenly =>
+                  Between := Free / (N + 1);
+                  Cursor := Between;
+            end case;
+         end if;
+      end;
+
       --  Step 7: place items one after the other along the main axis.
       for K in Items'Range loop
          pragma Loop_Invariant (Cursor >= 0);
@@ -230,7 +282,7 @@ package body Boxflex.Flex with SPARK_Mode is
             Pos (To_Units (Items (K).Margin_Cross_Start) + Cross_Offset (C, Items (K)));
 
          Cursor := Cursor + To_Units (Items (K).Main)
-                           + To_Units (Items (K).Margin_Main_End) + Gap;
+                           + To_Units (Items (K).Margin_Main_End) + Gap + Between;
       end loop;
    end Resolve;
 
