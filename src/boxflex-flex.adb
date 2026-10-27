@@ -78,6 +78,8 @@ package body Boxflex.Flex with SPARK_Mode is
    ---------------------
 
    procedure Distribute_Grow (C : Container; Items : in out Item_Array) is
+      Max_U : constant Units := To_Units (Length'Last); --  2**30
+      Step_Max : constant Units := 4 * Max_U; --  most one item adds to used
       Used : Units := 0;
       Total_Grow : Units := 0;
       Free : Units;
@@ -86,6 +88,9 @@ package body Boxflex.Flex with SPARK_Mode is
    begin
       --  1. How much of the line is already taken, and how much grow is there?
       for K in Items'Range loop
+         pragma Loop_Invariant (Used in 0 .. Units (K - Items'First) * Step_Max);
+         pragma Loop_Invariant
+            (Total_Grow in 0 .. Units (K - Items'First) * Grow_Units (Ratio'Last));
          Used := Used + To_Units (Items (K).Margin_Main_Start)
                         + To_Units (Items (K).Main)
                         + To_Units (Items (K).Margin_Main_End);
@@ -102,15 +107,29 @@ package body Boxflex.Flex with SPARK_Mode is
       --  2. Each item gets Free * Grow / Total_Grow (integer division
       --     rounds down, so a few units may be left over).
       for K in Items'Range loop
+         pragma Loop_Invariant (Given in 0 .. Free);
+         pragma Loop_Invariant
+            (for all J in Items'Range =>
+               Inputs_Unchanged (Items'Loop_Entry (J), Items (J))
+               and then Items (J).Main >= Items'Loop_Entry (J).Main);
          Share := Free * Grow_Units (Items (K).Grow) / Total_Grow;
+         --  Never more than what is left, nor more than a Length holds.
+         --  Neither cap changes the result for a real line.
+         Share := Units'Min (Share, Free - Given);
+         Share := Units'Min (Share, Max_U - To_Units (Items (K).Main));
          Items (K).Main := To_Length (To_Units (Items (K).Main) + Share);
          Given := Given + Share;
       end loop;
       --  3. Hand out the leftover units one at a time, first growing item
       --    first, until the line is filled exactly.
       for K in Items'Range loop
+         pragma Loop_Invariant (Given in 0 .. Free);
+         pragma Loop_Invariant
+            (for all J in Items'Range =>
+               Inputs_Unchanged (Items'Loop_Entry (J), Items (J))
+               and then Items (J).Main >= Items'Loop_Entry (J).Main);
          exit when Given = Free;
-         if Items (K).Grow > 0.0 then
+         if Items (K).Grow > 0.0 and then Items (K).Main < Length'Last then
             Items (K).Main := To_Length (To_Units (Items (K).Main) + 1);
             Given := Given + 1;
          end if;
