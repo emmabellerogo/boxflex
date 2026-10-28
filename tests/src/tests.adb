@@ -129,7 +129,7 @@ procedure Tests is
       Check ("resolve: packed",     It (2).Pos_Main = 55.0);
       Check ("resolve: in range",   Placed_In_Range (It (1)) and Placed_In_Range (It (2)));
 
-      --  grow: 200 - (5 + 50 + 80) = 65 xp free, split evenly (32.5 each)
+      --  grow: 200 - (5 + 50 + 80) = 65 px free, split evenly (32.5 each)
       declare
          G : Item_Array (1 .. 2) :=
              [1 => (Basis => 50.0, Basis_Definite => True, Grow => 1.0,
@@ -172,7 +172,7 @@ procedure Tests is
          Check ("grow: zero grow leaves the size alone", G (1).Main = 50.0);
       end;
 
-      -- stretch: container 300 x 100, default Align is Stretch declase
+      --  stretch: container 300 x 100, default Align is Stretch
       declare
          SC : constant Container := (Main => 300.0, Cross => 100.0, others => <>);
          S  : Item_Array (1 .. 4) :=
@@ -205,6 +205,21 @@ procedure Tests is
          A (1).Self := Flex_Start;
          Resolve (AC, A);
          Check ("align: self overrides container", A (1).Pos_Cross = 0.0);
+
+         --  Auto inherits the container's Center: (100 - 32) / 2 = 34
+         AC.Align := Center;
+         A (1).Self := Auto;
+         Resolve (AC, A);
+         Check ("align: auto inherits container center", A (1).Pos_Cross = 34.0);
+      end;
+
+      --  Self => Stretch still stretches inside a Flex_Start container
+      declare
+         SS : Item_Array (1 .. 1) := [1 => (Self => Stretch, others => <>)];
+      begin
+         Resolve ((Main => 300.0, Cross => 100.0, Align => Flex_Start, others => <>), SS);
+         Check ("align: self stretch overrides container flex-start",
+                  SS (1).Cross = 100.0 and then SS (1).Pos_Cross = 0.0);
       end;
 
       --  pending, once grow is implemented:
