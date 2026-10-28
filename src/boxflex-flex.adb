@@ -140,7 +140,7 @@ package body Boxflex.Flex with SPARK_Mode is
    -- Cross helpers --
    -------------------
 
-   --  The item's own Self winsl Auto means "use the container's Align"
+   --  The item's own Self wins; Auto means "use the container's Align"
    function Effective_Align (C : Container; I : Item) return Align_Self is
       (if I.Self /= Auto then I.Self
        else (case C.Align is
@@ -149,7 +149,6 @@ package body Boxflex.Flex with SPARK_Mode is
                when Flex_End     => Flex_End,
                when Center  => Center,
                when Baseline => Baseline));
-   --  The item's own Self wins over the container's Align, except that Auto is ignored.
 
    function Room (C : Container; I : Item) return Units is
       (To_Units (C.Cross) - To_Units (I.Margin_Cross_Start)
@@ -217,7 +216,7 @@ package body Boxflex.Flex with SPARK_Mode is
       --   Units to Coord, saturating at Max_Pos.
 
    begin
-   --  Step 1: every items starts at its hypothetical main size.
+   --  Step 1: every item starts at its hypothetical main size.
       for K in Items'Range loop
          Items (K).Main := Hypothetical_Main (Items (K));
          Items (K).Cross :=

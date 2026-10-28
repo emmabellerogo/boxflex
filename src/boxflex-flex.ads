@@ -143,9 +143,9 @@ package Boxflex.Flex with SPARK_Mode is
    --    6. Align / Self along the cross axis, Lines across lines,
    --    7. write positions.
    --
-   --  The seed body is a PLACEHOLDER: it packs items one after the
-   --  other at their hypothetical main size, no grow, no shrink, no
-   --  wrap, Flex_Start everywhere. Replacing it is the project.
+   --  Implemented so far: steps 1, 3 (grow only), 4, 6 (single line)
+   --  and 7. Still missing: shrink, wrap, align-content and
+   --  reversed directions.
 
    ---------------------------------------------------------------------
    --  Pieces, exposed so they can be tested and proved one at a time
