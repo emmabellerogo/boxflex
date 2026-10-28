@@ -222,6 +222,21 @@ procedure Tests is
                   SS (1).Cross = 100.0 and then SS (1).Pos_Cross = 0.0);
       end;
 
+      --  justify-content with a single item
+      declare
+         J1 : Item_Array (1 .. 1) :=
+           [1 => (Basis => 40.0, Basis_Definite => True, others => <>)];
+      begin
+         Resolve ((Main => 100.0, Cross => 10.0, Justify => Space_Between,
+                   others => <>), J1);
+         Check ("justify: space-between with one item acts like flex-start",
+                J1 (1).Pos_Main = 0.0);
+         Resolve ((Main => 100.0, Cross => 10.0, Justify => Space_Around,
+                   others => <>), J1);
+         Check ("justify: space-around with one item centers it",
+                J1 (1).Pos_Main = 30.0);
+      end;
+
       --  pending, once grow is implemented:
       --  It (1).Grow := 1.0; It (2).Grow := 1.0; It (2).Max_Main := Length'Last;
       --  Resolve (C, It);
