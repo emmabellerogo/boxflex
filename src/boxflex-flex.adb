@@ -22,7 +22,8 @@ package body Boxflex.Flex with SPARK_Mode is
    --  Units back to a Length. The caller guarantees it fits.
 
    function Clamp (V, Lo, Hi : Length) return Length is
-     (if V < Lo then Lo elsif Hi >= Lo and then V > Hi then Hi else V);
+      (if V < Lo or else Hi < Lo then Lo elsif V > Hi then Hi else V);
+   --  Min wins over max when they conflict (Hi < Lo), as in CSS.
 
    -----------------------
    -- Hypothetical_Main --

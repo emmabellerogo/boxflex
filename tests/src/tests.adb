@@ -455,6 +455,98 @@ procedure Tests is
              abs (2 * To_Steps (A (1).Pos_Cross) - Free) < 2);
    end Test_Center_Rounding;
 
+      procedure Test_Edge_Cases is
+      use Boxflex.Flex;
+   begin
+      --  No items at all: Resolve must simply do nothing.
+      declare
+         E : Item_Array (1 .. 0);
+      begin
+         Resolve ((Main => 100.0, Cross => 100.0, others => <>), E);
+         Check ("edge: empty line resolves", E'Length = 0);
+      end;
+
+      --  Cross margins bigger than the container: stretch gives 0, not
+      --  a negative size, and the item still starts after its margin.
+      declare
+         M : Item_Array (1 .. 1) :=
+           [1 => (Margin_Cross_Start => 8.0, Margin_Cross_End => 8.0,
+                  others => <>)];
+      begin
+         Resolve ((Main => 100.0, Cross => 10.0, others => <>), M);
+         Check ("edge: margins wider than the line stretch to 0",
+                M (1).Cross = 0.0 and then M (1).Pos_Cross = 8.0);
+      end;
+
+      --  Items already overflow the line: there is no free space, so
+      --  grow changes nothing (shrink is not implemented yet).
+      declare
+         O : Item_Array (1 .. 2) :=
+           [others => (Basis => 80.0, Basis_Definite => True, Grow => 1.0,
+                       others => <>)];
+      begin
+         Resolve ((Main => 100.0, Cross => 10.0, others => <>), O);
+         Check ("edge: overflowing items do not grow",
+                O (1).Main = 80.0 and then O (2).Main = 80.0);
+         Check ("edge: overflowing item is placed past the end",
+                O (2).Pos_Main = 80.0);
+      end;
+
+      --  A zero-size container: growers stay at 0.
+      declare
+         Z : Item_Array (1 .. 2) :=
+           [others => (Grow => 1.0, others => <>)];
+      begin
+         Resolve ((Main => 0.0, Cross => 0.0, others => <>), Z);
+         Check ("edge: zero-size container",
+                Z (1).Main = 0.0 and then Z (2).Main = 0.0
+                and then Z (2).Pos_Main = 0.0);
+      end;
+
+      --  Min_Cross above Max_Cross: min wins, as in CSS.
+      declare
+         X : Item_Array (1 .. 1) :=
+           [1 => (Min_Cross => 50.0, Max_Cross => 20.0, others => <>)];
+      begin
+         Resolve ((Main => 100.0, Cross => 100.0, others => <>), X);
+         Check ("edge: min cross wins over max cross",
+                X (1).Cross = 50.0);
+      end;
+
+      --  Same conflict on the main axis, with a basis above both limits.
+      declare
+         H : constant Item :=
+           (Basis => 120.0, Basis_Definite => True,
+            Min_Main => 100.0, Max_Main => 50.0, others => <>);
+      begin
+         Check ("edge: min main wins when basis is above both",
+                Hypothetical_Main (H) = 100.0);
+      end;
+
+      --  Grow remainder, computed from the rule: 1 px = 256 steps over
+      --  three growers is 85 each with 1 step left over. The leftover
+      --  goes to the first item that grows, skipping the Grow = 0 item.
+      declare
+         R : Item_Array (1 .. 4) :=
+           [1      => (Grow => 0.0, others => <>),
+            2 .. 4 => (Grow => 1.0, others => <>)];
+         Free  : constant Steps := To_Steps (1.0);
+         Share : constant Steps := Free / 3;
+      begin
+         Resolve ((Main => 1.0, Cross => 10.0, others => <>), R);
+         Check ("edge: zero-grow item gets nothing",
+                R (1).Main = 0.0);
+         Check ("edge: leftover step goes to the first grower",
+                To_Steps (R (2).Main) = Share + 1);
+         Check ("edge: other growers get the rounded-down share",
+                To_Steps (R (3).Main) = Share
+                and then To_Steps (R (4).Main) = Share);
+         Check ("edge: remainder conserved",
+                To_Steps (R (2).Main) + To_Steps (R (3).Main)
+                + To_Steps (R (4).Main) = Free);
+      end;
+   end Test_Edge_Cases;
+
    procedure Test_Justify_Rounding is
       use Boxflex.Flex;
       --  space-evenly with 2 items: 100 px free over 3 spaces is 33.33 px,
@@ -479,6 +571,7 @@ begin
    Test_Layout;
    Test_Showcase;
    Test_Center_Rounding;
+   Test_Edge_Cases;
    Test_Justify_Rounding;
 
    New_Line;
