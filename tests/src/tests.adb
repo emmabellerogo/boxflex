@@ -274,13 +274,13 @@ procedure Tests is
              and Layout_Of (T, B).Origin.X = 100.0);
 
       --  pending: two equal growers split the main axis
-      --  Check ("A is left half",  Layout_Of (T, A) = Make (0.0,   0.0, 100.0, 100.0));
-      --  Check ("B is right half", Layout_Of (T, B) = Make (100.0, 0.0, 100.0, 100.0));
-      --  Check ("siblings do not overlap",
-      --         not Overlaps (Layout_Of (T, A), Layout_Of (T, B)));
-      --  Check ("children inside parent",
-      --         Contains (Layout_Of (T, R), Layout_Of (T, A))
-      --         and Contains (Layout_Of (T, R), Layout_Of (T, B)));
+        Check ("A is left half",  Layout_Of (T, A) = Make (0.0,   0.0, 100.0, 100.0));
+        Check ("B is right half", Layout_Of (T, B) = Make (100.0, 0.0, 100.0, 100.0));
+        Check ("siblings do not overlap",
+               not Overlaps (Layout_Of (T, A), Layout_Of (T, B)));
+        Check ("children inside parent",
+               Contains (Layout_Of (T, R), Layout_Of (T, A))
+              and Contains (Layout_Of (T, R), Layout_Of (T, B)));
    end Test_Layout;
 
    ---------------------------------------------------------------------
