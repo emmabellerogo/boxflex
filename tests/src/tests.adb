@@ -537,6 +537,39 @@ procedure Tests is
                 To_Steps (R (2).Main) + To_Steps (R (3).Main)
                 + To_Steps (R (4).Main) = Free);
       end;
+
+            --  Shrink edge cases
+      declare
+         P : Item_Array (1 .. 2) :=
+           [others => (Basis => 100.0, Basis_Definite => True,
+                       others => <>)];
+      begin
+         --  Shrink 0 keeps its size; the other item takes the cut.
+         P (1).Shrink := 0.0;
+         Resolve ((Main => 150.0, Cross => 10.0, others => <>), P);
+         Check ("edge: shrink 0 keeps its size",
+                P (1).Main = 100.0 and then P (2).Main = 50.0);
+
+         --  First item stops at its minimum of 90.
+         P (1).Shrink := 1.0;
+         P (1).Min_Main := 90.0;
+         Resolve ((Main => 150.0, Cross => 10.0, others => <>), P);
+         Check ("edge: shrink stops at min and the rest moves on",
+                P (1).Main = 90.0 and then P (2).Main = 60.0);
+
+         --  Both items stop at 80, even if the line overflows.
+         P (1).Min_Main := 80.0;
+         P (2).Min_Main := 80.0;
+         Resolve ((Main => 100.0, Cross => 10.0, others => <>), P);
+         Check ("edge: shrink never goes below min, line overflows",
+                P (1).Main = 80.0 and then P (2).Main = 80.0
+                and then P (2).Pos_Main = 80.0);
+
+         --  No shrink needed when both items fit.
+         Resolve ((Main => 300.0, Cross => 10.0, others => <>), P);
+         Check ("edge: no shrink when the line fits",
+                P (1).Main = 100.0 and then P (2).Main = 100.0);
+      end;
    end Test_Edge_Cases;
 
    procedure Test_Justify_Rounding is
