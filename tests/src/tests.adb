@@ -233,6 +233,22 @@ procedure Tests is
          Check ("justify: space-around with one item centers it",
                 J1 (1).Pos_Main = 30.0);
       end;
+      --  shrink: one item wider than the line, and a content-sized item
+      declare
+         W1 : Item_Array (1 .. 1) :=
+            [1 => (Basis => 150.0, Basis_Definite => True, others => <>)];
+         W2 : Item_Array (1 .. 2) :=
+            [1 => (Content_Main => 120.0, others => <>),
+            2 => (Basis => 80.0, Basis_Definite => True, others => <>)];
+      begin
+         Resolve ((Main => 100.0, Cross => 10.0, others => <>), W1);
+         Check ("shrink: one item shrinks to fit the line", W1 (1).Main = 100.0);
+
+         --  200 in 100, weights 120 : 80, so 60 and 40 are cut
+         Resolve ((Main => 100.0, Cross => 10.0, others => <>), W2);
+         Check ("shrink: content-sized item shrinks by its content size",
+                  W2 (1).Main = 60.0 and then W2 (2).Main = 40.0);
+      end;
    end Test_Flex;
 
    ---------------------------------------------------------------------
