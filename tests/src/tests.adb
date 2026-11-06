@@ -185,6 +185,33 @@ procedure Tests is
          Check ("stretch: max wins", S (4).Cross = 60.0);
       end;
 
+      
+      --  justify-content spacing tests
+      --  Three 50 px items in a 300 px container leave 150 px free
+      declare
+         JC : Container := (Main => 300.0, Cross => 10.0, others => <>);
+         J  : Item_Array (1 .. 3) :=
+           [others => (Basis => 50.0, Basis_Definite => True, others => <>)];
+      begin
+         JC.Justify := Space_Between;
+         Resolve (JC, J);
+         Check ("justify: space-between",
+                J (1).Pos_Main = 0.0 and then J (2).Pos_Main = 125.0
+                and then J (3).Pos_Main = 250.0);
+
+         JC.Justify := Space_Around;
+         Resolve (JC, J);
+         Check ("justify: space-around",
+                J (1).Pos_Main = 25.0 and then J (2).Pos_Main = 125.0
+                and then J (3).Pos_Main = 225.0);
+
+         JC.Justify := Space_Evenly;
+         Resolve (JC, J);
+         Check ("justify: space-evenly",
+                J (1).Pos_Main = 37.5 and then J (2).Pos_Main = 125.0
+                and then J (3).Pos_Main = 212.5);
+      end;
+
       --  cross-axis alignment: 32 px item in a 100 px line
       declare
          AC : Container := (Main => 300.0, Cross => 100.0, others => <>);
