@@ -169,6 +169,38 @@ procedure Tests is
          Check ("grow: zero grow leaves the size alone", G (1).Main = 50.0);
       end;
 
+       --  justify-content, by position: three 50 px items in a 300 px
+         --  line leave 150 px free. Shrink => 0.0 so the overflow check
+         --  still overflows once shrink exists.
+         declare
+            JC : Container := (Main => 300.0, Cross => 10.0, others => <>);
+            J  : Item_Array (1 .. 3) :=
+              [others => (Basis => 50.0, Basis_Definite => True, Shrink => 0.0,
+                          others => <>)];
+         begin
+            Resolve (JC, J);
+            Check ("justify: flex-start packs at 0",
+                   J (1).Pos_Main = 0.0 and then J (3).Pos_Main = 100.0);
+
+            JC.Justify := Flex_End;
+            Resolve (JC, J);
+            Check ("justify: flex-end", J (1).Pos_Main = 150.0 and then J (3).Pos_Main = 250.0);
+
+            JC.Justify := Center;
+            Resolve (JC, J);
+            Check ("justify: center", J (1).Pos_Main = 75.0 and then J (3).Pos_Main = 175.0);
+
+            JC.Main := 100.0;
+            Resolve (JC, J);
+            Check ("justify: overflow pins to the start", J (1).Pos_Main = 0.0);
+
+            JC.Main := 300.0;
+            J (1).Grow := 1.0;
+            Resolve (JC, J);
+            Check ("justify: no effect once grow fills the line",
+                   J (1).Pos_Main = 0.0 and then J (1).Main = 200.0);
+         end;
+
       --  stretch: container 300 x 100, default Align is Stretch
       declare
          SC : constant Container := (Main => 300.0, Cross => 100.0, others => <>);
