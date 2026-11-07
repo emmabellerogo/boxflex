@@ -201,6 +201,37 @@ procedure Tests is
                    J (1).Pos_Main = 0.0 and then J (1).Main = 200.0);
          end;
 
+          --  shrink: the line is too short, so items give up space in
+      --  proportion to Shrink x their size (CSS 9.7)
+      declare
+         K2 : Item_Array (1 .. 2) :=
+           [others => (Basis => 100.0, Basis_Definite => True, others => <>)];
+      begin
+         --  50 px too much, equal weights: 25 px each
+         Resolve ((Main => 150.0, Cross => 10.0, others => <>), K2);
+         Check ("shrink: equal items share the overflow",
+                K2 (1).Main = 75.0 and then K2 (2).Main = 75.0
+                and then K2 (2).Pos_Main = 75.0);
+
+         --  80 px too much, Shrink 1 : 3, so 20 and 60
+         K2 (2).Shrink := 3.0;
+         Resolve ((Main => 120.0, Cross => 10.0, others => <>), K2);
+         Check ("shrink: by shrink factor",
+                K2 (1).Main = 80.0 and then K2 (2).Main = 40.0);
+
+         --  the 10 px gap counts too: 210 in 160, 25 px each
+         K2 (2).Shrink := 1.0;
+         Resolve ((Main => 160.0, Cross => 10.0, Main_Gap => 10.0, others => <>), K2);
+         Check ("shrink: gaps count as used space",
+                K2 (1).Main = 75.0 and then K2 (2).Pos_Main = 85.0);
+
+         --  100 and 300 in 200: weights 1 : 3, so 50 and 150 are cut
+         K2 (2).Basis := 300.0;
+         Resolve ((Main => 200.0, Cross => 10.0, others => <>), K2);
+         Check ("shrink: bigger items give up more",
+                K2 (1).Main = 50.0 and then K2 (2).Main = 150.0);
+      end;
+
       --  stretch: container 300 x 100, default Align is Stretch
       declare
          SC : constant Container := (Main => 300.0, Cross => 100.0, others => <>);
