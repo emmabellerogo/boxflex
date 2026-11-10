@@ -7,6 +7,22 @@ package body Boxflex.Layout with SPARK_Mode is
    subtype Slot is Positive range 1 .. Max_Nodes;
    type Id_Array is array (Slot) of Node_Id;
 
+   type Size_Array is array (Valid_Node_Id) of Size;
+   --  One hugged size per node id. Indexed by Valid_Node_Id (not Slot,
+   --  which is a Positive range) so that a Node_Id can index it directly.
+
+   type Units is range 0 .. 2 ** 40;
+   --  Sums along one axis, in 1/256 px steps.
+
+   Step   : constant Length := Length'Small;
+   Max_Up : constant Units := Units (Length'Last / Step);  --  2**30
+
+   function To_Units (L : Length) return Units is (Units (L / Step));
+
+   function To_Length (U : Units) return Length is
+     (if U >= Max_Up then Length'Last else Step * Integer (U));
+   --  Back to a Length, saturating at Length'Last.
+
    ---------------------------------------------------------------------
    --  Resolving style dimensions against the parent's content box
    ---------------------------------------------------------------------
@@ -22,6 +38,70 @@ package body Boxflex.Layout with SPARK_Mode is
    function Is_Definite (D : Dimension) return Boolean is
      (D.Kind in Fixed | Percent);
 
+   function Hug
+     (T         : Layout_Tree;
+      N         : Node_Id;
+      Hugged    : Size_Array;
+      Available : Size) return Size
+     with Pre => Well_Formed (T) and then Is_Valid (T, N);
+   --  The border box N needs to fit its children on one line.
+
+   function Hug
+     (T         : Layout_Tree;
+      N         : Node_Id;
+      Hugged    : Size_Array;
+      Available : Size) return Size
+   is
+      S     : constant Flex_Style := Style_Of (T, N);
+      A     : constant Axis := (if Is_Row (S) then Horizontal else Vertical);
+      Main  : Units := 0;
+      Cross : Units := 0;
+      Child : Node_Id := First_Child_Of (T, N);
+   begin
+      while Child /= No_Node loop
+         pragma Loop_Variant (Increases => Child);
+         pragma Loop_Invariant (Is_Valid (T, Child));
+         pragma Loop_Invariant (Main <= Max_Up and then Cross <= Max_Up);
+         declare
+            CS   : constant Flex_Style := Style_Of (T, Child);
+            Base : constant Size :=
+              (if First_Child_Of (T, Child) /= No_Node then Hugged (Child)
+               else Measure (T, Child, Available));
+            W : constant Length :=
+              (if CS.Width.Kind = Fixed then CS.Width.Value else Base.Width);
+            H : constant Length :=
+              (if CS.Height.Kind = Fixed then CS.Height.Value else Base.Height);
+            Outer_W : constant Units :=
+              To_Units (CS.Margin.Left) + To_Units (W) + To_Units (CS.Margin.Right);
+            Outer_H : constant Units :=
+              To_Units (CS.Margin.Top) + To_Units (H) + To_Units (CS.Margin.Bottom);
+         begin
+            if Child /= First_Child_Of (T, N) then
+               Main := Units'Min (Main + To_Units (S.Gap), Max_Up);
+            end if;
+            Main  := Units'Min
+              (Main + (if A = Horizontal then Outer_W else Outer_H), Max_Up);
+            Cross := Units'Max (Cross, (if A = Horizontal then Outer_H else Outer_W));
+            Cross := Units'Min (Cross, Max_Up);
+         end;
+         Child := Next_Sibling_Of (T, Child);
+      end loop;
+
+      declare
+         Pad_W : constant Units :=
+           To_Units (S.Padding.Left) + To_Units (S.Padding.Right)
+           + To_Units (S.Border.Left) + To_Units (S.Border.Right);
+         Pad_H : constant Units :=
+           To_Units (S.Padding.Top) + To_Units (S.Padding.Bottom)
+           + To_Units (S.Border.Top) + To_Units (S.Border.Bottom);
+      begin
+         return Make_Size
+           (Main  => To_Length (Main + (if A = Horizontal then Pad_W else Pad_H)),
+            Cross => To_Length (Cross + (if A = Horizontal then Pad_H else Pad_W)),
+            A     => A);
+      end;
+   end Hug;
+
    ---------------------------------------------------------------------
    --  One child, as the engine sees it
    ---------------------------------------------------------------------
@@ -30,14 +110,16 @@ package body Boxflex.Layout with SPARK_Mode is
      (T       : Layout_Tree;
       N       : Node_Id;
       A       : Axis;
-      Content : Size) return Item
+      Content : Size;
+      Measured : Size) return Item
      with Pre => Is_Valid (T, N);
 
    function Make_Item
      (T       : Layout_Tree;
       N       : Node_Id;
       A       : Axis;
-      Content : Size) return Item
+      Content : Size;
+      Measured : Size) return Item
    is
       S : constant Flex_Style := Style_Of (T, N);
 
@@ -50,8 +132,6 @@ package body Boxflex.Layout with SPARK_Mode is
       Max_Main  : constant Dimension := (if A = Horizontal then S.Max_Width  else S.Max_Height);
       Min_Cross : constant Dimension := (if A = Horizontal then S.Min_Height else S.Min_Width);
       Max_Cross : constant Dimension := (if A = Horizontal then S.Max_Height else S.Max_Width);
-
-      Measured : constant Size := Measure (T, N, Content);
 
       I : Item;
    begin
@@ -111,7 +191,16 @@ package body Boxflex.Layout with SPARK_Mode is
    is
       Ids   : Id_Array   := [others => No_Node];
       Items : Item_Array (Slot) := [others => <>];
+      Hugged : Size_Array := [others => Zero_Size];
    begin
+      --  Bottom-up: children before parents (Well_Formed: Parent_Of (N) < N),
+      --  so every container's children are hugged before it is.
+      for N in reverse 1 .. T.Count loop
+         if First_Child_Of (T, N) /= No_Node then
+            Hugged (N) := Hug (T, N, Hugged, Available);
+         end if;
+      end loop;
+
       --  Start clean so every rect satisfies Placed from here on.
       for N in 1 .. T.Count loop
          pragma Loop_Invariant (Well_Formed (T));
@@ -177,7 +266,10 @@ package body Boxflex.Layout with SPARK_Mode is
                   pragma Loop_Invariant (Count < Natural (Child));
                   Count := Count + 1;
                   Ids (Count)   := Child;
-                  Items (Count) := Make_Item (T, Child, A, Content.Extent);
+                  Items (Count) := Make_Item
+                    (T, Child, A, Content.Extent,
+                     (if First_Child_Of (T, Child) /= No_Node then Hugged (Child)
+                      else Measure (T, Child, Content.Extent)));
                   Child := Next_Sibling_Of (T, Child);
                end loop;
 
