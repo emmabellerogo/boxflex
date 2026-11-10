@@ -176,7 +176,8 @@ package body Boxflex.Flex with SPARK_Mode is
    -------------
 
    function Main_Free (C : Container; Items : Item_Array) return Units
-     with Pre => Items'Length <= Max_Nodes;
+     with Pre  => Items'Length <= Max_Nodes,
+          Post => Main_Free'Result in -(2 ** 40) .. 2 ** 30;
    --  Main-axis space the line does not use, after grow. Negative when
    --  the items overflow the container.
 
@@ -204,11 +205,18 @@ package body Boxflex.Flex with SPARK_Mode is
       --  Weights are scaled below this, so Need * weight fits in Units.
       Frozen : array (Items'Range) of Boolean;
       Free, Need, Total, Scale, Cut, Given : Units;
+      W, D : Units;
       Violated : Boolean;
 
       function Weight (I : Item) return Units is
-        (Grow_Units (I.Shrink) * To_Units (I.Main));
+        (Grow_Units (I.Shrink) * To_Units (I.Main))
+        with Post => Weight'Result in 0 .. 2 ** 50;
       --  Scaled shrink factor: Shrink times the item's size (CSS 9.7).
+
+      function Main_Units (I : Item) return Units is (To_Units (I.Main))
+        with Post => Main_Units'Result in 0 .. 2 ** 30
+                     and then Main_Units'Result <= To_Units (Length'Last);
+      --  The item's size in steps, with its bound stated for the prover.
    begin
       --  Items that cannot shrink are frozen from the start.
       for K in Items'Range loop
@@ -219,12 +227,16 @@ package body Boxflex.Flex with SPARK_Mode is
       --  Each round either finishes or freezes at least one more item,
       --  so Items'Length rounds are always enough.
       for Round in Items'Range loop
+         pragma Loop_Invariant
+           (for all J in Items'Range =>
+              Inputs_Unchanged (Items'Loop_Entry (J), Items (J)));
          Free := Main_Free (C, Items);
          exit when Free >= 0;
          Need := -Free;
 
          Total := 0;
          for K in Items'Range loop
+            pragma Loop_Invariant (Total in 0 .. Units (K - Items'First) * 2 ** 50);
             if not Frozen (K) then
                Total := Total + Weight (Items (K));
             end if;
@@ -232,15 +244,21 @@ package body Boxflex.Flex with SPARK_Mode is
          exit when Total = 0;
 
          Scale := 1;
-         while Total / Scale >= Limit loop
+         while Total / Scale >= Limit and then Scale < 2 ** 40 loop
+            pragma Loop_Invariant (Scale in 1 .. 2 ** 40 - 1);
             Scale := Scale * 2;
          end loop;
 
          --  Would any item go below its minimum? Freeze those at the min.
          Violated := False;
          for K in Items'Range loop
+            pragma Loop_Invariant
+              (for all J in Items'Range =>
+                 Inputs_Unchanged (Items'Loop_Entry (J), Items (J)));
             if not Frozen (K) then
-               Cut := Need * (Weight (Items (K)) / Scale) / (Total / Scale);
+               W   := Units'Min (Weight (Items (K)) / Scale, Limit - 1);
+               D   := Units'Max (Total / Scale, 1);
+               Cut := Need * W / D;
                if To_Units (Items (K).Main) - Cut < To_Units (Items (K).Min_Main) then
                   Items (K).Main := Items (K).Min_Main;
                   Frozen (K) := True;
@@ -252,14 +270,25 @@ package body Boxflex.Flex with SPARK_Mode is
          if not Violated then
             Given := 0;
             for K in Items'Range loop
+               pragma Loop_Invariant (Given in 0 .. Units (K - Items'First) * 2 ** 30);
+               pragma Loop_Invariant
+                 (for all J in Items'Range =>
+                    Inputs_Unchanged (Items'Loop_Entry (J), Items (J)));
                if not Frozen (K) then
-                  Cut := Need * (Weight (Items (K)) / Scale) / (Total / Scale);
-                  Items (K).Main := To_Length (To_Units (Items (K).Main) - Cut);
+                  W   := Units'Min (Weight (Items (K)) / Scale, Limit - 1);
+                  D   := Units'Max (Total / Scale, 1);
+                  pragma Assert (Need in 1 .. 2 ** 40 and then W in 0 .. Limit - 1 and then D >= 1);
+                  Cut := Need * W / D;
+                  Cut := Units'Min (Cut, Main_Units (Items (K)));
+                  Items (K).Main := To_Length (Main_Units (Items (K)) - Cut);
                   Given := Given + Cut;
                end if;
             end loop;
             --  Rounding left a few steps: take them one at a time.
             for K in Items'Range loop
+               pragma Loop_Invariant
+                 (for all J in Items'Range =>
+                    Inputs_Unchanged (Items'Loop_Entry (J), Items (J)));
                exit when Given >= Need;
                if not Frozen (K) and then Items (K).Main > Items (K).Min_Main then
                   Items (K).Main := To_Length (To_Units (Items (K).Main) - 1);

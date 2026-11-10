@@ -195,7 +195,10 @@ package Boxflex.Flex with SPARK_Mode is
    --  free space or no item has Grow > 0. Max_Main is not applied yet.
 
    procedure Distribute_Shrink (C : Container; Items : in out Item_Array)
-     with Pre => Items'Length <= Max_Nodes;
+     with
+       Pre  => Items'Length <= Max_Nodes,
+       Post => (for all K in Items'Range =>
+                  Inputs_Unchanged (Items'Old (K), Items (K)));
    --  Step 3, negative free space, for a single line. When the items
    --  overflow C.Main, each one gives up overflow * (Shrink * Main) /
    --  (sum of Shrink * Main). An item that would go below Min_Main is
