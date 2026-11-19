@@ -1035,6 +1035,93 @@ begin
    end;
 end Test_Auto_Size;
 
+procedure Test_Percent is
+   T : Layout_Tree;
+   S : Flex_Style;
+begin
+   --  1. 50% of the content box: (400 - 10 - 10) / 2 = 190
+   declare
+      Root, A : Node_Id;
+   begin
+      S := Default_Style;
+      S.Direction := Row;
+      S.Padding := Uniform (10.0);
+      Insert (T, No_Node, S, Root);
+
+      S := Default_Style;
+      S.Width := Pct (0.5);
+      S.Height := Px (20.0);
+      Insert (T, Root, S, A);
+
+      Boxflex.Layout_Plain.Compute (T, (Width => 400.0, Height => 300.0));
+      Check ("pct: width is a share of the content box",
+             Layout_Of (T, A) = Make (10.0, 10.0, 190.0, 20.0));
+   end;
+
+   --  2. Heights in a column: 25% and 50% of 300
+   declare
+      Root, A, B : Node_Id;
+   begin
+      Clear (T);
+      S := Default_Style;
+      S.Direction := Column;
+      Insert (T, No_Node, S, Root);
+
+      S := Default_Style;
+      S.Height := Pct (0.25);
+      Insert (T, Root, S, A);
+      S.Height := Pct (0.5);
+      Insert (T, Root, S, B);
+
+      Boxflex.Layout_Plain.Compute (T, (Width => 400.0, Height => 300.0));
+      Check ("pct: heights in a column",
+             Layout_Of (T, A) = Make (0.0, 0.0, 400.0, 75.0)
+             and then Layout_Of (T, B) = Make (0.0, 75.0, 400.0, 150.0));
+   end;
+
+   --  3. Grow starts from the percentage: 100 + 200 free
+   declare
+      Root, A, B : Node_Id;
+   begin
+      Clear (T);
+      S := Default_Style;
+      S.Direction := Row;
+      Insert (T, No_Node, S, Root);
+
+      S := Default_Style;
+      S.Width := Pct (0.25);
+      S.Grow := 1.0;
+      Insert (T, Root, S, A);
+      S := Default_Style;
+      S.Width := Px (100.0);
+      Insert (T, Root, S, B);
+
+      Boxflex.Layout_Plain.Compute (T, (Width => 400.0, Height => 100.0));
+      Check ("pct: grow starts from the percentage",
+             Layout_Of (T, A) = Make (0.0, 0.0, 300.0, 100.0)
+             and then Layout_Of (T, B) = Make (300.0, 0.0, 100.0, 100.0));
+   end;
+
+   --  4. A percentage max-width: 50% of 400 caps a 300 px width
+   declare
+      Root, A : Node_Id;
+   begin
+      Clear (T);
+      S := Default_Style;
+      S.Direction := Row;
+      Insert (T, No_Node, S, Root);
+
+      S := Default_Style;
+      S.Width := Px (300.0);
+      S.Max_Width := Pct (0.5);
+      Insert (T, Root, S, A);
+
+      Boxflex.Layout_Plain.Compute (T, (Width => 400.0, Height => 100.0));
+      Check ("pct: max-width as a percentage",
+             Layout_Of (T, A) = Make (0.0, 0.0, 200.0, 100.0));
+   end;
+end Test_Percent;
+
 begin
    Test_Geometry;
    Test_Tree;
@@ -1047,6 +1134,7 @@ begin
    Test_Justify_Rounding;
    Test_Shrink_Rounding;
    Test_Auto_Size;
+   Test_Percent;
    Test_Auto_Size_Edges;
 
    New_Line;
