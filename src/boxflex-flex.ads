@@ -144,7 +144,8 @@ package Boxflex.Flex with SPARK_Mode is
    --    7. write positions.
    --
    --  Implemented so far: steps 1, 3, 4, 5 and 6 (single line) and 7.
-   --  Still missing: wrap, align-content and reversed directions.
+   --  Still missing: wrap and align-content. Reversed directions are
+   --  handled by the caller (Boxflex.Layout mirrors Pos_Main at write-back).
 
    ---------------------------------------------------------------------
    --  Pieces, exposed so they can be tested and proved one at a time

@@ -18,7 +18,6 @@
 --    * a bottom-up pass so a container's own content size comes from
 --      its children (today Auto-sized containers get Content = 0),
 --    * percentages against the parent's content box,
---    * Row_Reverse / Column_Reverse, which flip the main axis origin.
 
 with Boxflex.Geometry; use Boxflex.Geometry;
 with Boxflex.Style;    use Boxflex.Style;
