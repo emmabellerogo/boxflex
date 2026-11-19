@@ -23,6 +23,14 @@ package body Boxflex.Layout with SPARK_Mode is
      (if U >= Max_Up then Length'Last else Step * Integer (U));
    --  Back to a Length, saturating at Length'Last.
 
+   function Flip (Extent : Length; Pos : Coord; Size : Length) return Coord is
+     (Coord'Min ((if Pos <= 0.0 then Extent - Size else (Extent - Size) - Pos),
+                 Max_Pos));
+   --  Mirrors a main-axis position for Row_Reverse and Column_Reverse:
+   --  an item Pos from the start ends up Pos from the end. Resolve never
+   --  returns a negative Pos, so the first branch never changes a result;
+   --  it lets the prover see that the subtraction cannot overflow.
+
    ---------------------------------------------------------------------
    --  Resolving style dimensions against the parent's content box
    ---------------------------------------------------------------------
@@ -111,7 +119,8 @@ package body Boxflex.Layout with SPARK_Mode is
       N       : Node_Id;
       A       : Axis;
       Content : Size;
-      Measured : Size) return Item
+      Measured : Size;
+      Reversed : Boolean) return Item
      with Pre => Is_Valid (T, N);
 
    function Make_Item
@@ -119,7 +128,8 @@ package body Boxflex.Layout with SPARK_Mode is
       N       : Node_Id;
       A       : Axis;
       Content : Size;
-      Measured : Size) return Item
+      Measured : Size;
+      Reversed : Boolean) return Item
    is
       S : constant Flex_Style := Style_Of (T, N);
 
@@ -167,13 +177,13 @@ package body Boxflex.Layout with SPARK_Mode is
       I.Max_Cross := Resolve (Max_Cross, Cross_Avail, Length'Last);
 
       if A = Horizontal then
-         I.Margin_Main_Start  := S.Margin.Left;
-         I.Margin_Main_End    := S.Margin.Right;
+         I.Margin_Main_Start  := (if Reversed then S.Margin.Right else S.Margin.Left);
+         I.Margin_Main_End    := (if Reversed then S.Margin.Left else S.Margin.Right);
          I.Margin_Cross_Start := S.Margin.Top;
          I.Margin_Cross_End   := S.Margin.Bottom;
       else
-         I.Margin_Main_Start  := S.Margin.Top;
-         I.Margin_Main_End    := S.Margin.Bottom;
+         I.Margin_Main_Start  := (if Reversed then S.Margin.Bottom else S.Margin.Top);
+         I.Margin_Main_End    := (if Reversed then S.Margin.Top else S.Margin.Bottom);
          I.Margin_Cross_Start := S.Margin.Left;
          I.Margin_Cross_End   := S.Margin.Right;
       end if;
@@ -269,7 +279,8 @@ package body Boxflex.Layout with SPARK_Mode is
                   Items (Count) := Make_Item
                     (T, Child, A, Content.Extent,
                      (if First_Child_Of (T, Child) /= No_Node then Hugged (Child)
-                      else Measure (T, Child, Content.Extent)));
+                      else Measure (T, Child, Content.Extent)),
+                     Is_Reversed (S));
                   Child := Next_Sibling_Of (T, Child);
                end loop;
 
@@ -288,18 +299,21 @@ package body Boxflex.Layout with SPARK_Mode is
                     (for all J in 1 .. T.Count => Placed (Layout_Of (T, J)));
                   declare
                      I : constant Item := Items (K);
+                     Main_Pos : constant Coord :=
+                       (if Is_Reversed (S) then Flip (C.Main, I.Pos_Main, I.Main)
+                        else I.Pos_Main);
                      R : Rect;
                   begin
                      if A = Horizontal then
                         R := Make
-                          (X      => Place (Content.Origin.X, I.Pos_Main),
+                          (X      => Place (Content.Origin.X, Main_Pos),
                            Y      => Place (Content.Origin.Y, I.Pos_Cross),
                            Width  => I.Main,
                            Height => I.Cross);
                      else
                         R := Make
                           (X      => Place (Content.Origin.X, I.Pos_Cross),
-                           Y      => Place (Content.Origin.Y, I.Pos_Main),
+                           Y      => Place (Content.Origin.Y, Main_Pos),
                            Width  => I.Cross,
                            Height => I.Main);
                      end if;
