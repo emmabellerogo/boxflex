@@ -521,6 +521,181 @@ begin
 end Test_Auto_Size_Edges;
 
 
+   procedure Test_Reverse is
+      T : Layout_Tree;
+      S : Flex_Style;
+   begin
+      --  1. Row_Reverse: first child touches the right edge
+      declare
+         Root, A, B, C : Node_Id;
+      begin
+         S := Default_Style;
+         S.Direction := Row_Reverse;
+         S.Align := Flex_Start;
+         Insert (T, No_Node, S, Root);
+
+         S := Default_Style;
+         S.Width := Px (50.0);
+         S.Height := Px (20.0);
+         Insert (T, Root, S, A);
+         Insert (T, Root, S, B);
+         Insert (T, Root, S, C);
+
+         Boxflex.Layout_Plain.Compute
+           (T, (Width => 400.0, Height => 100.0));
+         Check ("reverse: row packs from the right",
+                Layout_Of (T, A) = Make (350.0, 0.0, 50.0, 20.0)
+                and then Layout_Of (T, B) = Make (300.0, 0.0, 50.0, 20.0)
+                and then Layout_Of (T, C) = Make (250.0, 0.0, 50.0, 20.0));
+      end;
+
+      --  2. Column_Reverse with a gap
+      declare
+         Root, A, B : Node_Id;
+      begin
+         Clear (T);
+         S := Default_Style;
+         S.Direction := Column_Reverse;
+         S.Align := Flex_Start;
+         S.Gap := 10.0;
+         Insert (T, No_Node, S, Root);
+
+         S := Default_Style;
+         S.Width := Px (40.0);
+         S.Height := Px (30.0);
+         Insert (T, Root, S, A);
+         S.Width := Px (60.0);
+         S.Height := Px (50.0);
+         Insert (T, Root, S, B);
+
+         Boxflex.Layout_Plain.Compute
+           (T, (Width => 400.0, Height => 300.0));
+         Check ("reverse: column packs from the bottom, gap kept",
+                Layout_Of (T, A) = Make (0.0, 270.0, 40.0, 30.0)
+                and then Layout_Of (T, B) = Make (0.0, 210.0, 60.0, 50.0));
+      end;
+
+      --  3. Flex_End in Row_Reverse packs at the left
+      declare
+         Root, A, B : Node_Id;
+      begin
+         Clear (T);
+         S := Default_Style;
+         S.Direction := Row_Reverse;
+         S.Align := Flex_Start;
+         S.Justify := Flex_End;
+         Insert (T, No_Node, S, Root);
+
+         S := Default_Style;
+         S.Width := Px (100.0);
+         S.Height := Px (20.0);
+         Insert (T, Root, S, A);
+         S.Width := Px (50.0);
+         Insert (T, Root, S, B);
+
+         Boxflex.Layout_Plain.Compute
+           (T, (Width => 400.0, Height => 100.0));
+         Check ("reverse: flex-end packs at the left",
+                Layout_Of (T, A) = Make (50.0, 0.0, 100.0, 20.0)
+                and then Layout_Of (T, B) = Make (0.0, 0.0, 50.0, 20.0));
+      end;
+
+      --  4. Physical margins
+      declare
+         Root, A, B : Node_Id;
+      begin
+         Clear (T);
+         S := Default_Style;
+         S.Direction := Row_Reverse;
+         S.Align := Flex_Start;
+         Insert (T, No_Node, S, Root);
+
+         S := Default_Style;
+         S.Width := Px (50.0);
+         S.Height := Px (20.0);
+         S.Margin := (Left => 10.0, others => 0.0);
+         Insert (T, Root, S, A);
+         S.Margin := No_Edges;
+         Insert (T, Root, S, B);
+
+         Boxflex.Layout_Plain.Compute
+           (T, (Width => 400.0, Height => 100.0));
+         Check ("reverse: margin-left stays on the left",
+                Layout_Of (T, A) = Make (350.0, 0.0, 50.0, 20.0)
+                and then Layout_Of (T, B) = Make (290.0, 0.0, 50.0, 20.0));
+      end;
+
+      --  5. Padding
+      declare
+         Root, A : Node_Id;
+      begin
+         Clear (T);
+         S := Default_Style;
+         S.Direction := Row_Reverse;
+         S.Align := Flex_Start;
+         S.Padding := Uniform (10.0);
+         Insert (T, No_Node, S, Root);
+
+         S := Default_Style;
+         S.Width := Px (50.0);
+         S.Height := Px (20.0);
+         Insert (T, Root, S, A);
+
+         Boxflex.Layout_Plain.Compute
+           (T, (Width => 400.0, Height => 100.0));
+         Check ("reverse: mirrored inside the padding",
+                Layout_Of (T, A) = Make (340.0, 10.0, 50.0, 20.0));
+      end;
+
+      --  6. Grow, then mirror
+      declare
+         Root, A, B : Node_Id;
+      begin
+         Clear (T);
+         S := Default_Style;
+         S.Direction := Row_Reverse;
+         Insert (T, No_Node, S, Root);
+
+         S := Default_Style;
+         S.Grow := 1.0;
+         Insert (T, Root, S, A);
+
+         S := Default_Style;
+         S.Width := Px (100.0);
+         Insert (T, Root, S, B);
+
+         Boxflex.Layout_Plain.Compute
+           (T, (Width => 400.0, Height => 100.0));
+         Check ("reverse: grow then mirror",
+                Layout_Of (T, A) = Make (100.0, 0.0, 300.0, 100.0)
+                and then Layout_Of (T, B) = Make (0.0, 0.0, 100.0, 100.0));
+      end;
+
+      --  7. Overflow past the left edge
+      declare
+         Root, A : Node_Id;
+      begin
+         Clear (T);
+         S := Default_Style;
+         S.Direction := Row_Reverse;
+         S.Align := Flex_Start;
+         Insert (T, No_Node, S, Root);
+
+         S := Default_Style;
+         S.Width := Px (150.0);
+         S.Height := Px (20.0);
+         S.Shrink := 0.0;
+         Insert (T, Root, S, A);
+
+         Boxflex.Layout_Plain.Compute
+           (T, (Width => 100.0, Height => 50.0));
+         Check ("reverse: overflow goes past the left edge",
+                Layout_Of (T, A) = Make (-50.0, 0.0, 150.0, 20.0));
+      end;
+   end Test_Reverse;
+
+
+
    ---------------------------------------------------------------------
    --  Rules: expected values are worked out from the engine's rules in
    --  whole 1/256 px steps, never copied from a browser. The browser
@@ -1136,6 +1311,7 @@ begin
    Test_Auto_Size;
    Test_Percent;
    Test_Auto_Size_Edges;
+   Test_Reverse;
 
    New_Line;
    if Failures = 0 then
