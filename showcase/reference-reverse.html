@@ -1,0 +1,69 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>boxflex reference: reversed directions</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font: 14px monospace; padding: 20px 20px 20px 120px; }
+  .case { display: flex; background: #eef; margin-bottom: 30px; }
+  .case > div { background: #88c; }
+  pre { margin-top: 20px; }
+</style>
+</head>
+<body>
+<!-- 1. row-reverse: the first child touches the right edge -->
+<div class="case" data-name="1" style="flex-direction: row-reverse; align-items: flex-start;
+     width: 400px; height: 100px;">
+  <div data-name="A" style="width: 50px; height: 20px;"></div>
+  <div data-name="B" style="width: 50px; height: 20px;"></div>
+  <div data-name="C" style="width: 50px; height: 20px;"></div>
+</div>
+<!-- 2. column-reverse with a gap -->
+<div class="case" data-name="2" style="flex-direction: column-reverse; align-items: flex-start;
+     gap: 10px; width: 400px; height: 300px;">
+  <div data-name="A" style="width: 40px; height: 30px;"></div>
+  <div data-name="B" style="width: 60px; height: 50px;"></div>
+</div>
+<!-- 3. flex-end in row-reverse packs at the left -->
+<div class="case" data-name="3" style="flex-direction: row-reverse; align-items: flex-start;
+     justify-content: flex-end; width: 400px; height: 100px;">
+  <div data-name="A" style="width: 100px; height: 20px;"></div>
+  <div data-name="B" style="width: 50px; height: 20px;"></div>
+</div>
+<!-- 4. margins are physical -->
+<div class="case" data-name="4" style="flex-direction: row-reverse; align-items: flex-start;
+     width: 400px; height: 100px;">
+  <div data-name="A" style="width: 50px; height: 20px; margin-left: 10px;"></div>
+  <div data-name="B" style="width: 50px; height: 20px;"></div>
+</div>
+<!-- 5. mirrored inside the padding -->
+<div class="case" data-name="5" style="flex-direction: row-reverse; align-items: flex-start;
+     padding: 10px; width: 400px; height: 100px;">
+  <div data-name="A" style="width: 50px; height: 20px;"></div>
+</div>
+<!-- 6. grow, then mirror -->
+<div class="case" data-name="6" style="flex-direction: row-reverse; width: 400px; height: 100px;">
+  <div data-name="A" style="flex-grow: 1;"></div>
+  <div data-name="B" style="width: 100px;"></div>
+</div>
+<!-- 7. overflow goes past the left edge -->
+<div class="case" data-name="7" style="flex-direction: row-reverse; align-items: flex-start;
+     width: 100px; height: 50px;">
+  <div data-name="A" style="width: 150px; height: 20px; flex-shrink: 0;"></div>
+</div>
+<pre id="out"></pre>
+<script>
+  const lines = [];
+  for (const root of document.querySelectorAll('.case')) {
+    const r0 = root.getBoundingClientRect();
+    for (const el of root.querySelectorAll('[data-name]')) {
+      const r = el.getBoundingClientRect();
+      lines.push(`case ${root.dataset.name}  ${el.dataset.name} = (` +
+        `${r.x - r0.x}, ${r.y - r0.y}, ${r.width}, ${r.height})`);
+    }
+  }
+  document.getElementById('out').textContent = lines.join('\n');
+</script>
+</body>
+</html>

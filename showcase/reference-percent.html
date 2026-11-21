@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>boxflex reference: percentages</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font: 14px monospace; padding: 20px 20px 20px 120px; }
+  .case { display: flex; background: #eef; margin-bottom: 30px; }
+  .case > div { background: #88c; }
+  pre { margin-top: 20px; }
+</style>
+</head>
+<body>
+<!-- 1. 50% of the content box -->
+<div class="case" data-name="1" style="flex-direction: row; padding: 10px;
+     width: 400px; height: 300px;">
+  <div data-name="A" style="width: 50%; height: 20px;"></div>
+</div>
+<!-- 2. heights in a column -->
+<div class="case" data-name="2" style="flex-direction: column; width: 400px; height: 300px;">
+  <div data-name="A" style="height: 25%;"></div>
+  <div data-name="B" style="height: 50%;"></div>
+</div>
+<!-- 3. grow starts from the percentage -->
+<div class="case" data-name="3" style="flex-direction: row; width: 400px; height: 100px;">
+  <div data-name="A" style="width: 25%; flex-grow: 1;"></div>
+  <div data-name="B" style="width: 100px;"></div>
+</div>
+<!-- 4. a percentage max-width -->
+<div class="case" data-name="4" style="flex-direction: row; width: 400px; height: 100px;">
+  <div data-name="A" style="width: 300px; max-width: 50%;"></div>
+</div>
+<pre id="out"></pre>
+<script>
+  const lines = [];
+  for (const root of document.querySelectorAll('.case')) {
+    const r0 = root.getBoundingClientRect();
+    for (const el of root.querySelectorAll('[data-name]')) {
+      const r = el.getBoundingClientRect();
+      lines.push(`case ${root.dataset.name}  ${el.dataset.name} = (` +
+        `${r.x - r0.x}, ${r.y - r0.y}, ${r.width}, ${r.height})`);
+    }
+  }
+  document.getElementById('out').textContent = lines.join('\n');
+</script>
+</body>
+</html>
